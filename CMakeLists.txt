@@ -11,6 +11,7 @@ include(CMakePackageConfigHelpers)
 
 if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
   set(EXECUTION_UCX_IS_TOP_LEVEL ON)
+  include(CTest)
 else()
   set(EXECUTION_UCX_IS_TOP_LEVEL OFF)
 endif()
@@ -50,6 +51,19 @@ if(EXECUTION_UCX_ENABLE_CUDA)
       $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   target_link_libraries(execution_ucx_cuda INTERFACE CUDA::cudart CUDA::cuda_driver)
   set_target_properties(execution_ucx_cuda PROPERTIES EXPORT_NAME cuda)
+
+  if(BUILD_TESTING)
+    add_executable(execution_ucx_cuda_two_gpu_test test_code/cuda_two_gpu_test.cpp)
+    target_compile_features(execution_ucx_cuda_two_gpu_test PRIVATE cxx_std_17)
+    target_link_libraries(execution_ucx_cuda_two_gpu_test PRIVATE execution-ucx::cuda)
+
+    add_test(NAME execution_ucx.cuda_two_gpu COMMAND execution_ucx_cuda_two_gpu_test)
+    set_tests_properties(
+      execution_ucx.cuda_two_gpu
+      PROPERTIES
+        SKIP_RETURN_CODE 77
+        TIMEOUT 60)
+  endif()
 endif()
 
 if(EXECUTION_UCX_BUILD_UCX)

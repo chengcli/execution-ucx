@@ -94,8 +94,8 @@ Combine `-DEXECUTION_UCX_ENABLE_CUDA=ON` with
 The installed OpenUCX distribution must itself be built with CUDA support for
 GPU-Direct RDMA.
 
-To consume execution-ucx from another CMake project, including snapy, set its
-options before `FetchContent_MakeAvailable`:
+To consume execution-ucx from another CMake project, set its options before
+`FetchContent_MakeAvailable`:
 
 ```cmake
 include(FetchContent)
@@ -117,7 +117,7 @@ target_link_libraries(your_target PRIVATE execution-ucx::runtime)
 When embedded, execution-ucx reuses existing `UCX::ucp` or `ucx::ucp` and
 `unifex::unifex` targets supplied by the parent project. Otherwise it finds
 installed OpenUCX and libunifex packages. Its CMake 3.18 minimum matches
-snapy's minimum.
+the version declared by this project.
 
 ## Usage Example
 

@@ -43,7 +43,7 @@ Its design goal is to provide an efficient, flexible, and composable asynchronou
 
 ## Build and Test
 
-The project is built using Bazel.
+The project can be built using Bazel or CMake.
 
 1.  **Build the project**:
     ```bash
@@ -60,6 +60,64 @@ The project is built using Bazel.
     ```bash
     bazel test //ucx_context:ucx_am_context_test --@rules_cuda//cuda:enable=True
     ```
+
+### CMake
+
+The default CMake build compiles the portable memory-resource component and
+does not require OpenUCX:
+
+```bash
+cmake -S . -B build
+cmake --build build
+```
+
+To build the OpenUCX runtime components, install OpenUCX 1.18.1 or later and a
+CMake-packaged libunifex, then enable the component:
+
+```bash
+cmake -S . -B build -DEXECUTION_UCX_BUILD_UCX=ON
+cmake --build build
+```
+
+Use `-DEXECUTION_UCX_BUILD_EXAMPLES=ON` with the UCX component to also build
+the README example.
+
+Enable CUDA support with:
+
+```bash
+cmake -S . -B build-gpu -DEXECUTION_UCX_ENABLE_CUDA=ON
+cmake --build build-gpu
+```
+
+Combine `-DEXECUTION_UCX_ENABLE_CUDA=ON` with
+`-DEXECUTION_UCX_BUILD_UCX=ON` to link CUDA support into the OpenUCX runtime.
+The installed OpenUCX distribution must itself be built with CUDA support for
+GPU-Direct RDMA.
+
+To consume execution-ucx from another CMake project, set its options before
+`FetchContent_MakeAvailable`:
+
+```cmake
+include(FetchContent)
+
+set(EXECUTION_UCX_BUILD_UCX ON CACHE BOOL "" FORCE)
+set(EXECUTION_UCX_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(EXECUTION_UCX_ENABLE_CUDA ${CUDA} CACHE BOOL "" FORCE)
+set(EXECUTION_UCX_INSTALL OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+  execution_ucx
+  GIT_REPOSITORY https://github.com/chengcli/execution-ucx.git
+  GIT_TAG <commit-or-tag>)
+FetchContent_MakeAvailable(execution_ucx)
+
+target_link_libraries(your_target PRIVATE execution-ucx::runtime)
+```
+
+When embedded, execution-ucx reuses existing `UCX::ucp` or `ucx::ucp` and
+`unifex::unifex` targets supplied by the parent project. Otherwise it finds
+installed OpenUCX and libunifex packages. Its CMake 3.18 minimum matches
+the version declared by this project.
 
 ## Usage Example
 
@@ -476,4 +534,3 @@ This section details the primary APIs provided by `RpcDispatcher`.
 ## License
 
 This project is licensed under the [Apache License 2.0](LICENSE) license.
-

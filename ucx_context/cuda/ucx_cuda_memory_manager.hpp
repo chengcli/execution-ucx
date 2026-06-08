@@ -20,6 +20,12 @@ limitations under the License.
 
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <ucs/memory/memory_type.h>
+
+#include <cstdlib>
+#include <cstring>
+#include <stdexcept>
+#include <string>
 
 #include "ucx_context/cuda/ucx_cuda_macro.h"
 #include "ucx_context/ucx_context_def.h"

@@ -44,3 +44,28 @@ eux::axon::c10d::InstallAxonBackend(
 
 The same backend instance is registered for each listed device type. A
 transport should only advertise device types whose memory it can access.
+
+## Python Registration
+
+Build the PyTorch binding with:
+
+```sh
+cmake -S . -B build \
+  -DEXECUTION_UCX_BUILD_AXON_C10D=ON \
+  -DEXECUTION_UCX_BUILD_AXON_C10D_PYTHON=ON \
+  -DCMAKE_PREFIX_PATH=/path/to/libtorch
+```
+
+Then register a transport factory before initializing `torch.distributed`:
+
+```python
+import axon
+import torch.distributed as dist
+
+axon.register_torch_backend(MyAxonTransport, devices=("cpu", "cuda"))
+dist.init_process_group("axon")
+```
+
+The factory receives `(store, rank, world_size, timeout)`. Its returned
+transport object must implement `send`, `recv`, `barrier`, `allreduce`, and
+`reduce`, with each method returning a PyTorch distributed `Work` object.

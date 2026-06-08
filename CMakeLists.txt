@@ -20,6 +20,7 @@ option(EXECUTION_UCX_BUILD_UCX "Build the OpenUCX runtime components" OFF)
 option(EXECUTION_UCX_BUILD_EXAMPLES "Build examples (requires the UCX components)" OFF)
 option(EXECUTION_UCX_ENABLE_CUDA "Enable CUDA support" OFF)
 option(EXECUTION_UCX_BUILD_AXON_C10D "Build the optional Axon PyTorch c10d backend adapter" OFF)
+option(EXECUTION_UCX_BUILD_AXON_C10D_PYTHON "Build Python bindings for the Axon c10d backend" OFF)
 option(EXECUTION_UCX_INSTALL "Generate execution-ucx install rules" ${EXECUTION_UCX_IS_TOP_LEVEL})
 
 add_library(execution_ucx_memory_resource ucx_context/ucx_memory_resource.cpp)
@@ -192,6 +193,47 @@ if(EXECUTION_UCX_BUILD_AXON_C10D)
   endif()
 endif()
 
+if(EXECUTION_UCX_BUILD_AXON_C10D_PYTHON)
+  if(NOT TARGET execution_ucx_axon_c10d)
+    message(FATAL_ERROR "EXECUTION_UCX_BUILD_AXON_C10D_PYTHON requires EXECUTION_UCX_BUILD_AXON_C10D=ON")
+  endif()
+
+  find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+  find_library(
+    TORCH_PYTHON_LIBRARY
+    NAMES torch_python
+    PATHS "${TORCH_INSTALL_PREFIX}/lib"
+    NO_DEFAULT_PATH
+    REQUIRED)
+
+  add_library(_axon_c10d MODULE axon/python/src/axon_c10d_python.cpp)
+  target_compile_features(_axon_c10d PRIVATE cxx_std_20)
+  target_link_libraries(
+    _axon_c10d
+    PRIVATE
+      execution-ucx::axon_c10d
+      Python::Module
+      "${TORCH_PYTHON_LIBRARY}")
+  set_target_properties(
+    _axon_c10d
+    PROPERTIES
+      PREFIX ""
+      LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/python/axon")
+
+  if(BUILD_TESTING)
+    add_test(
+      NAME execution_ucx.axon_c10d_python
+      COMMAND
+        Python::Interpreter
+        "${CMAKE_CURRENT_SOURCE_DIR}/axon/python/tests/test_c10d_backend_registration.py"
+        "${CMAKE_CURRENT_SOURCE_DIR}/axon/python"
+        "${CMAKE_CURRENT_BINARY_DIR}/python/axon")
+    set_tests_properties(
+      execution_ucx.axon_c10d_python
+      PROPERTIES TIMEOUT 60)
+  endif()
+endif()
+
 if(EXECUTION_UCX_INSTALL)
   install(
     TARGETS execution_ucx_memory_resource
@@ -222,6 +264,15 @@ if(EXECUTION_UCX_INSTALL)
       ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
       LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
       RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
+
+  if(TARGET _axon_c10d)
+    install(
+      TARGETS _axon_c10d
+      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/python/axon)
+    install(
+      FILES axon/python/axon/distributed.py
+      DESTINATION ${CMAKE_INSTALL_LIBDIR}/python/axon)
   endif()
 
   install(

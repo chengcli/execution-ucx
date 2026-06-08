@@ -43,7 +43,7 @@ Its design goal is to provide an efficient, flexible, and composable asynchronou
 
 ## Build and Test
 
-The project is built using Bazel.
+The project can be built using Bazel or CMake.
 
 1.  **Build the project**:
     ```bash
@@ -60,6 +60,27 @@ The project is built using Bazel.
     ```bash
     bazel test //ucx_context:ucx_am_context_test --@rules_cuda//cuda:enable=True
     ```
+
+### CMake
+
+The default CMake build compiles the portable memory-resource component and
+does not require OpenUCX:
+
+```bash
+cmake -S . -B build
+cmake --build build
+```
+
+To build the OpenUCX runtime components, install OpenUCX 1.18.1 or later and a
+CMake-packaged libunifex, then enable the component:
+
+```bash
+cmake -S . -B build -DEXECUTION_UCX_BUILD_UCX=ON
+cmake --build build
+```
+
+Use `-DEXECUTION_UCX_BUILD_EXAMPLES=ON` with the UCX component to also build
+the README example.
 
 ## Usage Example
 
@@ -476,4 +497,3 @@ This section details the primary APIs provided by `RpcDispatcher`.
 ## License
 
 This project is licensed under the [Apache License 2.0](LICENSE) license.
-

@@ -1,0 +1,14 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+if(@EXECUTION_UCX_CONFIG_HAS_RUNTIME@)
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
+  find_dependency(Threads)
+  find_dependency(UCX 1.18.1)
+  find_dependency(unifex CONFIG)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/execution-ucx-targets.cmake")
+
+check_required_components(execution-ucx)

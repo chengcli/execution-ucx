@@ -44,6 +44,11 @@ bazel-testlogs
 bazel-workspace
 bazel-execution-ucx
 
+# CMake
+build/
+cmake-build-*/
+CMakeUserPresets.json
+
 # VSCode
 .vscode
 .cursor

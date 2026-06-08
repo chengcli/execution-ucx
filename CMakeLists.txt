@@ -19,6 +19,7 @@ endif()
 option(EXECUTION_UCX_BUILD_UCX "Build the OpenUCX runtime components" OFF)
 option(EXECUTION_UCX_BUILD_EXAMPLES "Build examples (requires the UCX components)" OFF)
 option(EXECUTION_UCX_ENABLE_CUDA "Enable CUDA support" OFF)
+option(EXECUTION_UCX_BUILD_AXON_C10D "Build the optional Axon PyTorch c10d backend adapter" OFF)
 option(EXECUTION_UCX_INSTALL "Generate execution-ucx install rules" ${EXECUTION_UCX_IS_TOP_LEVEL})
 
 add_library(execution_ucx_memory_resource ucx_context/ucx_memory_resource.cpp)
@@ -143,6 +144,54 @@ elseif(EXECUTION_UCX_BUILD_EXAMPLES)
   message(FATAL_ERROR "EXECUTION_UCX_BUILD_EXAMPLES requires EXECUTION_UCX_BUILD_UCX=ON")
 endif()
 
+if(EXECUTION_UCX_BUILD_AXON_C10D)
+  find_package(Torch REQUIRED)
+
+  add_library(execution_ucx_axon_c10d axon/src/c10d/axon_backend.cpp)
+  add_library(execution-ucx::axon_c10d ALIAS execution_ucx_axon_c10d)
+  target_compile_features(execution_ucx_axon_c10d PUBLIC cxx_std_20)
+  target_include_directories(
+    execution_ucx_axon_c10d
+    PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/axon/include>
+      $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+  target_link_libraries(execution_ucx_axon_c10d PUBLIC ${TORCH_LIBRARIES})
+  set_target_properties(
+    execution_ucx_axon_c10d
+    PROPERTIES
+      EXPORT_NAME axon_c10d
+      POSITION_INDEPENDENT_CODE ON)
+
+  if(BUILD_TESTING)
+    add_executable(
+      execution_ucx_axon_c10d_test
+      axon/tests/axon_c10d_backend_test.cpp)
+    target_compile_features(execution_ucx_axon_c10d_test PRIVATE cxx_std_20)
+    target_link_libraries(
+      execution_ucx_axon_c10d_test
+      PRIVATE execution-ucx::axon_c10d)
+    add_test(
+      NAME execution_ucx.axon_c10d
+      COMMAND execution_ucx_axon_c10d_test)
+
+    add_executable(
+      execution_ucx_axon_c10d_gpu_test
+      axon/tests/axon_c10d_backend_gpu_test.cpp)
+    target_compile_features(execution_ucx_axon_c10d_gpu_test PRIVATE cxx_std_20)
+    target_link_libraries(
+      execution_ucx_axon_c10d_gpu_test
+      PRIVATE execution-ucx::axon_c10d)
+    add_test(
+      NAME execution_ucx.axon_c10d_gpu
+      COMMAND execution_ucx_axon_c10d_gpu_test)
+    set_tests_properties(
+      execution_ucx.axon_c10d_gpu
+      PROPERTIES
+        SKIP_RETURN_CODE 77
+        TIMEOUT 60)
+  endif()
+endif()
+
 if(EXECUTION_UCX_INSTALL)
   install(
     TARGETS execution_ucx_memory_resource
@@ -166,11 +215,26 @@ if(EXECUTION_UCX_INSTALL)
       EXPORT execution-ucx-targets)
   endif()
 
+  if(TARGET execution_ucx_axon_c10d)
+    install(
+      TARGETS execution_ucx_axon_c10d
+      EXPORT execution-ucx-targets
+      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
+
   install(
     DIRECTORY ucx_context/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ucx_context
     FILES_MATCHING
     PATTERN "*.h"
+    PATTERN "*.hpp")
+
+  install(
+    DIRECTORY axon/include/axon/c10d/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/axon/c10d
+    FILES_MATCHING
     PATTERN "*.hpp")
 
   install(
@@ -181,6 +245,7 @@ if(EXECUTION_UCX_INSTALL)
 
   set(EXECUTION_UCX_CONFIG_HAS_RUNTIME "${EXECUTION_UCX_BUILD_UCX}")
   set(EXECUTION_UCX_CONFIG_HAS_CUDA "${EXECUTION_UCX_ENABLE_CUDA}")
+  set(EXECUTION_UCX_CONFIG_HAS_AXON_C10D "${EXECUTION_UCX_BUILD_AXON_C10D}")
   configure_package_config_file(
     cmake/execution-ucx-config.cmake.in
     "${CMAKE_CURRENT_BINARY_DIR}/execution-ucx-config.cmake"

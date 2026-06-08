@@ -94,6 +94,31 @@ Combine `-DEXECUTION_UCX_ENABLE_CUDA=ON` with
 The installed OpenUCX distribution must itself be built with CUDA support for
 GPU-Direct RDMA.
 
+To consume execution-ucx from another CMake project, including snapy, set its
+options before `FetchContent_MakeAvailable`:
+
+```cmake
+include(FetchContent)
+
+set(EXECUTION_UCX_BUILD_UCX ON CACHE BOOL "" FORCE)
+set(EXECUTION_UCX_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(EXECUTION_UCX_ENABLE_CUDA ${CUDA} CACHE BOOL "" FORCE)
+set(EXECUTION_UCX_INSTALL OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+  execution_ucx
+  GIT_REPOSITORY https://github.com/chengcli/execution-ucx.git
+  GIT_TAG <commit-or-tag>)
+FetchContent_MakeAvailable(execution_ucx)
+
+target_link_libraries(your_target PRIVATE execution-ucx::runtime)
+```
+
+When embedded, execution-ucx reuses existing `UCX::ucp` or `ucx::ucp` and
+`unifex::unifex` targets supplied by the parent project. Otherwise it finds
+installed OpenUCX and libunifex packages. Its CMake 3.18 minimum matches
+snapy's minimum.
+
 ## Usage Example
 
 The following is a simplified example demonstrating how to send and receive an Active Message using `ucx_am_context`. It is based on the logic from the `TEST_F(UcxAmTest, SmallMessageTransfer)` test case.

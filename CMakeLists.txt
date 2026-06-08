@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.18)
 
 project(
   execution-ucx
@@ -9,9 +9,16 @@ project(
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
+if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+  set(EXECUTION_UCX_IS_TOP_LEVEL ON)
+else()
+  set(EXECUTION_UCX_IS_TOP_LEVEL OFF)
+endif()
+
 option(EXECUTION_UCX_BUILD_UCX "Build the OpenUCX runtime components" OFF)
 option(EXECUTION_UCX_BUILD_EXAMPLES "Build examples (requires the UCX components)" OFF)
 option(EXECUTION_UCX_ENABLE_CUDA "Enable CUDA support" OFF)
+option(EXECUTION_UCX_INSTALL "Generate execution-ucx install rules" ${EXECUTION_UCX_IS_TOP_LEVEL})
 
 add_library(execution_ucx_memory_resource ucx_context/ucx_memory_resource.cpp)
 add_library(execution-ucx::memory_resource ALIAS execution_ucx_memory_resource)
@@ -49,8 +56,15 @@ if(EXECUTION_UCX_BUILD_UCX)
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
   find_package(Threads REQUIRED)
-  find_package(UCX 1.18.1 REQUIRED)
-  find_package(unifex CONFIG REQUIRED)
+  if(TARGET ucx::ucp AND NOT TARGET UCX::ucp)
+    add_library(UCX::ucp ALIAS ucx::ucp)
+  endif()
+  if(NOT TARGET UCX::ucp)
+    find_package(UCX 1.18.1 REQUIRED)
+  endif()
+  if(NOT TARGET unifex::unifex AND NOT TARGET unifex)
+    find_package(unifex CONFIG REQUIRED)
+  endif()
 
   if(TARGET unifex AND NOT TARGET unifex::unifex)
     add_library(unifex::unifex ALIAS unifex)
@@ -115,58 +129,60 @@ elseif(EXECUTION_UCX_BUILD_EXAMPLES)
   message(FATAL_ERROR "EXECUTION_UCX_BUILD_EXAMPLES requires EXECUTION_UCX_BUILD_UCX=ON")
 endif()
 
-install(
-  TARGETS execution_ucx_memory_resource
-  EXPORT execution-ucx-targets
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-
-if(TARGET execution_ucx_runtime)
+if(EXECUTION_UCX_INSTALL)
   install(
-    TARGETS execution_ucx_runtime
+    TARGETS execution_ucx_memory_resource
     EXPORT execution-ucx-targets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-endif()
 
-if(TARGET execution_ucx_cuda)
+  if(TARGET execution_ucx_runtime)
+    install(
+      TARGETS execution_ucx_runtime
+      EXPORT execution-ucx-targets
+      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
+
+  if(TARGET execution_ucx_cuda)
+    install(
+      TARGETS execution_ucx_cuda
+      EXPORT execution-ucx-targets)
+  endif()
+
   install(
-    TARGETS execution_ucx_cuda
-    EXPORT execution-ucx-targets)
-endif()
+    DIRECTORY ucx_context/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ucx_context
+    FILES_MATCHING
+    PATTERN "*.h"
+    PATTERN "*.hpp")
 
-install(
-  DIRECTORY ucx_context/
-  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ucx_context
-  FILES_MATCHING
-  PATTERN "*.h"
-  PATTERN "*.hpp")
+  install(
+    EXPORT execution-ucx-targets
+    FILE execution-ucx-targets.cmake
+    NAMESPACE execution-ucx::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/execution-ucx)
 
-install(
-  EXPORT execution-ucx-targets
-  FILE execution-ucx-targets.cmake
-  NAMESPACE execution-ucx::
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/execution-ucx)
-
-set(EXECUTION_UCX_CONFIG_HAS_RUNTIME "${EXECUTION_UCX_BUILD_UCX}")
-set(EXECUTION_UCX_CONFIG_HAS_CUDA "${EXECUTION_UCX_ENABLE_CUDA}")
-configure_package_config_file(
-  cmake/execution-ucx-config.cmake.in
-  "${CMAKE_CURRENT_BINARY_DIR}/execution-ucx-config.cmake"
-  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/execution-ucx)
-write_basic_package_version_file(
-  "${CMAKE_CURRENT_BINARY_DIR}/execution-ucx-config-version.cmake"
-  VERSION ${PROJECT_VERSION}
-  COMPATIBILITY SameMajorVersion)
-
-install(
-  FILES
+  set(EXECUTION_UCX_CONFIG_HAS_RUNTIME "${EXECUTION_UCX_BUILD_UCX}")
+  set(EXECUTION_UCX_CONFIG_HAS_CUDA "${EXECUTION_UCX_ENABLE_CUDA}")
+  configure_package_config_file(
+    cmake/execution-ucx-config.cmake.in
     "${CMAKE_CURRENT_BINARY_DIR}/execution-ucx-config.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/execution-ucx)
+  write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/execution-ucx-config-version.cmake"
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/execution-ucx)
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion)
 
-if(EXECUTION_UCX_BUILD_UCX)
-  install(FILES cmake/FindUCX.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/execution-ucx)
+  install(
+    FILES
+      "${CMAKE_CURRENT_BINARY_DIR}/execution-ucx-config.cmake"
+      "${CMAKE_CURRENT_BINARY_DIR}/execution-ucx-config-version.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/execution-ucx)
+
+  if(EXECUTION_UCX_BUILD_UCX)
+    install(FILES cmake/FindUCX.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/execution-ucx)
+  endif()
 endif()

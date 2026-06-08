@@ -82,6 +82,18 @@ cmake --build build
 Use `-DEXECUTION_UCX_BUILD_EXAMPLES=ON` with the UCX component to also build
 the README example.
 
+Enable CUDA support with:
+
+```bash
+cmake -S . -B build-gpu -DEXECUTION_UCX_ENABLE_CUDA=ON
+cmake --build build-gpu
+```
+
+Combine `-DEXECUTION_UCX_ENABLE_CUDA=ON` with
+`-DEXECUTION_UCX_BUILD_UCX=ON` to link CUDA support into the OpenUCX runtime.
+The installed OpenUCX distribution must itself be built with CUDA support for
+GPU-Direct RDMA.
+
 ## Usage Example
 
 The following is a simplified example demonstrating how to send and receive an Active Message using `ucx_am_context`. It is based on the logic from the `TEST_F(UcxAmTest, SmallMessageTransfer)` test case.

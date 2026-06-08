@@ -30,7 +30,7 @@
 
 static constexpr size_t RNDV_THRESHOLD = 8192;
 
-namespace eux {
+namespace eux::ucxx {
 
 // Mock callback for testing
 class MockCallback : public UcxCallback {
@@ -137,10 +137,11 @@ void RunServer(
     cudaError_t cuda_status = cudaMalloc(&recv_data_device, recv_data.size());
     assert(
       cuda_status == cudaSuccess && "cudaMalloc failed for recv_data_device");
+    auto recv_callback =
+      std::make_unique<recv_am_nbx_callback>(recv_nbx_called);
     conn->recv_am_data(
       recv_data_device, recv_data.size(), nullptr, std::move(*arg.data_desc),
-      UCS_MEMORY_TYPE_CUDA,
-      std::make_unique<recv_am_nbx_callback>(recv_nbx_called));
+      UCS_MEMORY_TYPE_CUDA, recv_callback.get());
     while (!recv_nbx_called) {
       ucp_worker_progress(ucp_worker);
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -206,7 +207,7 @@ void RunClient(
   // Send data
   conn->send_am_data(
     header_data.data(), header_data.size(), send_data, send_data_size, nullptr,
-    UCS_MEMORY_TYPE_CUDA, std::move(send_callback));
+    UCS_MEMORY_TYPE_CUDA, send_callback.get());
 
   // Wait for data sending to complete
   while (!send_callback_called) {
@@ -221,7 +222,7 @@ void RunClient(
   conn->disconnect();
   ucp_worker_destroy(ucp_worker);
 }
-}  // namespace eux
+}  // namespace eux::ucxx
 
 int main() {
   cudaSetDevice(0);
@@ -309,7 +310,7 @@ int main() {
 
   // Start server thread
   std::thread server_thread(
-    eux::RunServer, server_ucp_worker, std::ref(client_address_buffer),
+    eux::ucxx::RunServer, server_ucp_worker, std::ref(client_address_buffer),
     std::ref(server_ready), std::ref(received_data), std::ref(test_complete));
 
   // Wait for server to be ready
@@ -328,7 +329,7 @@ int main() {
 
   // Start client thread
   std::thread client_thread(
-    eux::RunClient, client_ucp_worker, std::ref(server_address_buffer),
+    eux::ucxx::RunClient, client_ucp_worker, std::ref(server_address_buffer),
     send_data_device, send_data.size(), std::ref(client_ready),
     std::ref(test_complete));
 
@@ -337,6 +338,7 @@ int main() {
 
   // Wait for data reception to complete
   auto received = received_data.get_future().get();
+  assert(received == send_data);
 
   std::cout << "Received data size: " << received.size() << std::endl;
   std::cout << "First 16 bytes of received data: ";
@@ -350,7 +352,9 @@ int main() {
   server_thread.join();
   client_thread.join();
 
+  cudaFree(send_data_device);
   ucp_cleanup(ucp_context);
 
+  std::cout << "CUDA connection test passed." << std::endl;
   return 0;
 }

@@ -6,16 +6,28 @@ find_library(UCX_UCT_LIBRARY NAMES uct)
 find_library(UCX_UCM_LIBRARY NAMES ucm)
 
 set(UCX_VERSION "")
-if(UCX_INCLUDE_DIR AND EXISTS "${UCX_INCLUDE_DIR}/ucp/api/ucp_version.h")
+if(UCX_UCP_LIBRARY)
+  get_filename_component(UCX_LIBRARY_DIR "${UCX_UCP_LIBRARY}" DIRECTORY)
+  find_file(
+    UCX_CONFIG_VERSION_FILE
+    NAMES ucx-config-version.cmake
+    HINTS "${UCX_LIBRARY_DIR}/cmake/ucx"
+    NO_DEFAULT_PATH)
+endif()
+if(UCX_CONFIG_VERSION_FILE)
+  file(STRINGS "${UCX_CONFIG_VERSION_FILE}" UCX_CONFIG_VERSION_LINE
+       REGEX "^set\\(PACKAGE_VERSION [0-9.]+\\)")
+  string(REGEX MATCH "[0-9]+\\.[0-9]+\\.[0-9]+" UCX_VERSION
+               "${UCX_CONFIG_VERSION_LINE}")
+elseif(UCX_INCLUDE_DIR AND EXISTS "${UCX_INCLUDE_DIR}/ucp/api/ucp_version.h")
   file(STRINGS "${UCX_INCLUDE_DIR}/ucp/api/ucp_version.h" UCX_VERSION_LINES
-       REGEX "^#define UCP_API_(MAJOR|MINOR|RELEASE) ")
-  foreach(PART MAJOR MINOR RELEASE)
+       REGEX "^#define UCP_API_(MAJOR|MINOR) ")
+  foreach(PART MAJOR MINOR)
     string(REGEX MATCH "#define UCP_API_${PART} +([0-9]+)" MATCHED
                  "${UCX_VERSION_LINES}")
     set(UCX_VERSION_${PART} "${CMAKE_MATCH_1}")
   endforeach()
-  set(UCX_VERSION
-      "${UCX_VERSION_MAJOR}.${UCX_VERSION_MINOR}.${UCX_VERSION_RELEASE}")
+  set(UCX_VERSION "${UCX_VERSION_MAJOR}.${UCX_VERSION_MINOR}.0")
 endif()
 
 include(FindPackageHandleStandardArgs)
@@ -34,7 +46,8 @@ mark_as_advanced(
   UCX_UCP_LIBRARY
   UCX_UCS_LIBRARY
   UCX_UCT_LIBRARY
-  UCX_UCM_LIBRARY)
+  UCX_UCM_LIBRARY
+  UCX_CONFIG_VERSION_FILE)
 
 if(UCX_FOUND AND NOT TARGET UCX::ucp)
   add_library(UCX::ucs UNKNOWN IMPORTED)

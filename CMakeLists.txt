@@ -11,6 +11,7 @@ include(CMakePackageConfigHelpers)
 
 option(EXECUTION_UCX_BUILD_UCX "Build the OpenUCX runtime components" OFF)
 option(EXECUTION_UCX_BUILD_EXAMPLES "Build examples (requires the UCX components)" OFF)
+option(EXECUTION_UCX_ENABLE_CUDA "Enable CUDA support" OFF)
 
 add_library(execution_ucx_memory_resource ucx_context/ucx_memory_resource.cpp)
 add_library(execution-ucx::memory_resource ALIAS execution_ucx_memory_resource)
@@ -27,6 +28,22 @@ set_target_properties(
   PROPERTIES
     EXPORT_NAME memory_resource
     POSITION_INDEPENDENT_CODE ON)
+
+if(EXECUTION_UCX_ENABLE_CUDA)
+  enable_language(CUDA)
+  find_package(CUDAToolkit REQUIRED)
+
+  add_library(execution_ucx_cuda INTERFACE)
+  add_library(execution-ucx::cuda ALIAS execution_ucx_cuda)
+  target_compile_definitions(execution_ucx_cuda INTERFACE CUDA_ENABLED=1)
+  target_include_directories(
+    execution_ucx_cuda
+    INTERFACE
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+      $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+  target_link_libraries(execution_ucx_cuda INTERFACE CUDA::cudart CUDA::cuda_driver)
+  set_target_properties(execution_ucx_cuda PROPERTIES EXPORT_NAME cuda)
+endif()
 
 if(EXECUTION_UCX_BUILD_UCX)
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -62,6 +79,9 @@ if(EXECUTION_UCX_BUILD_UCX)
       UCX::ucp
       unifex::unifex
       Threads::Threads)
+  if(EXECUTION_UCX_ENABLE_CUDA)
+    target_link_libraries(execution_ucx_runtime PUBLIC execution-ucx::cuda)
+  endif()
 
   if(CMAKE_DL_LIBS)
     target_link_libraries(execution_ucx_runtime PRIVATE ${CMAKE_DL_LIBS})
@@ -80,6 +100,16 @@ if(EXECUTION_UCX_BUILD_UCX)
     add_executable(execution_ucx_readme_example test_code/readme.cpp)
     target_compile_features(execution_ucx_readme_example PRIVATE cxx_std_20)
     target_link_libraries(execution_ucx_readme_example PRIVATE execution-ucx::runtime)
+
+    if(EXECUTION_UCX_ENABLE_CUDA)
+      add_executable(execution_ucx_cuda_connection_example test_code/test_cuda_connection.cpp)
+      target_compile_features(execution_ucx_cuda_connection_example PRIVATE cxx_std_20)
+      target_link_libraries(execution_ucx_cuda_connection_example PRIVATE execution-ucx::runtime)
+
+      add_executable(execution_ucx_cuda_single_gpu_example test_code/cuda_single_gpu.cpp)
+      target_compile_features(execution_ucx_cuda_single_gpu_example PRIVATE cxx_std_20)
+      target_link_libraries(execution_ucx_cuda_single_gpu_example PRIVATE execution-ucx::runtime)
+    endif()
   endif()
 elseif(EXECUTION_UCX_BUILD_EXAMPLES)
   message(FATAL_ERROR "EXECUTION_UCX_BUILD_EXAMPLES requires EXECUTION_UCX_BUILD_UCX=ON")
@@ -101,6 +131,12 @@ if(TARGET execution_ucx_runtime)
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
+if(TARGET execution_ucx_cuda)
+  install(
+    TARGETS execution_ucx_cuda
+    EXPORT execution-ucx-targets)
+endif()
+
 install(
   DIRECTORY ucx_context/
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ucx_context
@@ -115,6 +151,7 @@ install(
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/execution-ucx)
 
 set(EXECUTION_UCX_CONFIG_HAS_RUNTIME "${EXECUTION_UCX_BUILD_UCX}")
+set(EXECUTION_UCX_CONFIG_HAS_CUDA "${EXECUTION_UCX_ENABLE_CUDA}")
 configure_package_config_file(
   cmake/execution-ucx-config.cmake.in
   "${CMAKE_CURRENT_BINARY_DIR}/execution-ucx-config.cmake"

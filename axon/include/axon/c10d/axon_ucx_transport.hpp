@@ -63,6 +63,7 @@ class AxonUcxTransport final : public AxonTransport {
     const std::vector<at::Tensor>& tensors, int dst_rank, uint64_t tag);
   void RecvTensors(
     std::vector<at::Tensor>& tensors, int src_rank, uint64_t tag);
+  void SynchronizeTensors(const std::vector<at::Tensor>& tensors) const;
   void WaitRequest(ucs_status_ptr_t request);
   void ValidateTensors(const std::vector<at::Tensor>& tensors) const;
   void ValidateSum(const ::c10d::ReduceOp& op) const;

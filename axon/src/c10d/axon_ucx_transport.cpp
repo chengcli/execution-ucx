@@ -22,6 +22,10 @@ limitations under the License.
 
 #include <c10/util/Exception.h>
 
+#ifdef AXON_C10D_CUDA_ENABLED
+#include <ATen/cuda/CUDAContext.h>
+#endif
+
 namespace eux::axon::c10d {
 namespace {
 
@@ -231,6 +235,7 @@ AxonUcxTransport::~AxonUcxTransport() {
 void AxonUcxTransport::SendTensors(
   const std::vector<at::Tensor>& tensors, int dst_rank, uint64_t tag) {
   ValidateTensors(tensors);
+  SynchronizeTensors(tensors);
   for (size_t i = 0; i < tensors.size(); ++i) {
     ucp_request_param_t params{};
     WaitRequest(ucp_tag_send_nbx(
@@ -242,12 +247,26 @@ void AxonUcxTransport::SendTensors(
 void AxonUcxTransport::RecvTensors(
   std::vector<at::Tensor>& tensors, int, uint64_t tag) {
   ValidateTensors(tensors);
+  SynchronizeTensors(tensors);
   for (size_t i = 0; i < tensors.size(); ++i) {
     ucp_request_param_t params{};
     WaitRequest(ucp_tag_recv_nbx(
       worker_, tensors[i].data_ptr(), tensors[i].nbytes(), tag + i,
       UINT64_MAX, &params));
   }
+}
+
+void AxonUcxTransport::SynchronizeTensors(
+  const std::vector<at::Tensor>& tensors) const {
+#ifdef AXON_C10D_CUDA_ENABLED
+  for (const auto& tensor : tensors) {
+    if (tensor.is_cuda()) {
+      at::cuda::getCurrentCUDAStream(tensor.device().index()).synchronize();
+    }
+  }
+#else
+  (void)tensors;
+#endif
 }
 
 void AxonUcxTransport::WaitRequest(ucs_status_ptr_t request) {
@@ -270,8 +289,16 @@ void AxonUcxTransport::ValidateTensors(
   const std::vector<at::Tensor>& tensors) const {
   TORCH_CHECK(!tensors.empty(), "AxonUcxTransport requires tensors");
   for (const auto& tensor : tensors) {
-    TORCH_CHECK(tensor.device().is_cpu(), "AxonUcxTransport currently supports CPU tensors");
-    TORCH_CHECK(tensor.is_contiguous(), "AxonUcxTransport requires contiguous tensors");
+    TORCH_CHECK(
+      tensor.device().is_cpu() || tensor.is_cuda(),
+      "AxonUcxTransport supports CPU and CUDA tensors only");
+#ifndef AXON_C10D_CUDA_ENABLED
+    TORCH_CHECK(
+      !tensor.is_cuda(),
+      "AxonUcxTransport CUDA support requires EXECUTION_UCX_ENABLE_CUDA=ON");
+#endif
+    TORCH_CHECK(
+      tensor.is_contiguous(), "AxonUcxTransport requires contiguous tensors");
   }
 }
 

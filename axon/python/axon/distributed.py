@@ -55,9 +55,9 @@ def register_backend(
 
 
 def register_ucx_backend(
-    *, name: str = "axon", devices: str | Iterable[str] = "cpu"
+    *, name: str = "axon", devices: str | Iterable[str] = ("cpu", "cuda")
 ) -> None:
-    """Register the built-in UCX transport for contiguous CPU tensors."""
+    """Register the built-in UCX transport for contiguous CPU/CUDA tensors."""
 
     import torch.distributed as dist
 

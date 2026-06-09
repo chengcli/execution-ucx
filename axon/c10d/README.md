@@ -85,5 +85,31 @@ torchrun --standalone --nproc-per-node=2 application.py
 `torchrun` supplies the rendezvous store, rank, world size, and timeout to each
 transport factory. Build the concrete UCX transport and bindings with
 `EXECUTION_UCX_BUILD_AXON_C10D_UCX=ON` and
-`EXECUTION_UCX_BUILD_AXON_C10D_PYTHON=ON`. It currently supports contiguous CPU
-tensors and SUM reductions.
+`EXECUTION_UCX_BUILD_AXON_C10D_PYTHON=ON`. Enable direct CUDA tensor transport
+with `EXECUTION_UCX_ENABLE_CUDA=ON`. The transport currently supports contiguous
+CPU and CUDA tensors and SUM reductions.
+
+## C++ ProcessGroup examples
+
+Build the standalone CPU and GPU examples with:
+
+```sh
+cmake -S . -B build \
+  -DEXECUTION_UCX_BUILD_AXON_C10D=ON \
+  -DEXECUTION_UCX_BUILD_AXON_C10D_UCX=ON \
+  -DEXECUTION_UCX_BUILD_AXON_C10D_EXAMPLES=ON \
+  -DEXECUTION_UCX_ENABLE_CUDA=ON
+cmake --build build
+```
+
+Launch rank 0 and rank 1 in separate processes using the same TCPStore address:
+
+```sh
+build/execution_ucx_axon_c10d_cpu_example 0 127.0.0.1 29500 &
+build/execution_ucx_axon_c10d_cpu_example 1 127.0.0.1 29500
+
+UCX_TLS=sm,cuda_copy,cuda_ipc \
+  build/execution_ucx_axon_c10d_gpu_example 0 127.0.0.1 29501 &
+UCX_TLS=sm,cuda_copy,cuda_ipc \
+  build/execution_ucx_axon_c10d_gpu_example 1 127.0.0.1 29501
+```

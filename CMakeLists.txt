@@ -21,6 +21,7 @@ option(EXECUTION_UCX_BUILD_EXAMPLES "Build examples (requires the UCX components
 option(EXECUTION_UCX_ENABLE_CUDA "Enable CUDA support" OFF)
 option(EXECUTION_UCX_BUILD_AXON_C10D "Build the optional Axon PyTorch c10d backend adapter" OFF)
 option(EXECUTION_UCX_BUILD_AXON_C10D_UCX "Build the concrete UCX Axon c10d transport" OFF)
+option(EXECUTION_UCX_BUILD_AXON_C10D_EXAMPLES "Build Axon PyTorch ProcessGroup examples" OFF)
 option(EXECUTION_UCX_BUILD_AXON_C10D_PYTHON "Build Python bindings for the Axon c10d backend" OFF)
 option(EXECUTION_UCX_INSTALL "Generate execution-ucx install rules" ${EXECUTION_UCX_IS_TOP_LEVEL})
 
@@ -212,11 +213,43 @@ if(EXECUTION_UCX_BUILD_AXON_C10D_UCX)
   target_link_libraries(
     execution_ucx_axon_c10d_ucx
     PUBLIC execution-ucx::axon_c10d UCX::ucp)
+  if(EXECUTION_UCX_ENABLE_CUDA)
+    target_compile_definitions(
+      execution_ucx_axon_c10d_ucx PUBLIC AXON_C10D_CUDA_ENABLED=1)
+    target_link_libraries(
+      execution_ucx_axon_c10d_ucx PUBLIC execution-ucx::cuda)
+  endif()
   set_target_properties(
     execution_ucx_axon_c10d_ucx
     PROPERTIES
       EXPORT_NAME axon_c10d_ucx
       POSITION_INDEPENDENT_CODE ON)
+
+  if(EXECUTION_UCX_BUILD_AXON_C10D_EXAMPLES)
+    add_executable(
+      execution_ucx_axon_c10d_cpu_example
+      axon/examples/process_group_cpu.cpp)
+    target_compile_features(
+      execution_ucx_axon_c10d_cpu_example PRIVATE cxx_std_20)
+    target_link_libraries(
+      execution_ucx_axon_c10d_cpu_example
+      PRIVATE execution-ucx::axon_c10d_ucx)
+
+    if(EXECUTION_UCX_ENABLE_CUDA)
+      add_executable(
+        execution_ucx_axon_c10d_gpu_example
+        axon/examples/process_group_gpu.cpp)
+      target_compile_features(
+        execution_ucx_axon_c10d_gpu_example PRIVATE cxx_std_20)
+      target_link_libraries(
+        execution_ucx_axon_c10d_gpu_example
+        PRIVATE execution-ucx::axon_c10d_ucx)
+    endif()
+  endif()
+endif()
+
+if(EXECUTION_UCX_BUILD_AXON_C10D_EXAMPLES AND NOT TARGET execution_ucx_axon_c10d_ucx)
+  message(FATAL_ERROR "EXECUTION_UCX_BUILD_AXON_C10D_EXAMPLES requires EXECUTION_UCX_BUILD_AXON_C10D_UCX=ON")
 endif()
 
 if(EXECUTION_UCX_BUILD_AXON_C10D_PYTHON)
@@ -285,6 +318,23 @@ if(EXECUTION_UCX_BUILD_AXON_C10D_PYTHON)
         PROPERTIES
           ENVIRONMENT "UCX_NET_DEVICES=lo"
           TIMEOUT 60)
+
+      if(EXECUTION_UCX_ENABLE_CUDA)
+        add_test(
+          NAME execution_ucx.axon_c10d_torchrun_gpu
+          COMMAND
+            "${TORCHRUN_EXECUTABLE}"
+            --standalone
+            --nproc-per-node=2
+            "${CMAKE_CURRENT_SOURCE_DIR}/axon/python/tests/test_c10d_backend_torchrun_gpu.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/axon/python"
+            "${CMAKE_CURRENT_BINARY_DIR}/python/axon")
+        set_tests_properties(
+          execution_ucx.axon_c10d_torchrun_gpu
+          PROPERTIES
+            ENVIRONMENT "UCX_TLS=sm,cuda_copy,cuda_ipc"
+            TIMEOUT 120)
+      endif()
     endif()
   endif()
 endif()

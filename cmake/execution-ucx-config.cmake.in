@@ -13,6 +13,15 @@ if(@EXECUTION_UCX_CONFIG_HAS_RUNTIME@)
   find_dependency(unifex CONFIG)
 endif()
 
+if(@EXECUTION_UCX_CONFIG_HAS_AXON_C10D_UCX@ AND NOT @EXECUTION_UCX_CONFIG_HAS_RUNTIME@)
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
+  find_dependency(UCX 1.18.1)
+endif()
+
+if(@EXECUTION_UCX_CONFIG_HAS_AXON_C10D@)
+  find_dependency(Torch)
+endif()
+
 include("${CMAKE_CURRENT_LIST_DIR}/execution-ucx-targets.cmake")
 
 check_required_components(execution-ucx)

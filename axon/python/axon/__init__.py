@@ -21,6 +21,10 @@ from .device import (
     sycl,
     auto_detect,
 )
+from .distributed import (
+    register_backend as register_torch_backend,
+    register_ucx_backend as register_torch_ucx_backend,
+)
 
 try:
     # UCX memory hooks (ucm) require RTLD_GLOBAL to intercept munmap/madvise
@@ -110,4 +114,7 @@ __all__ = [
     "rocm",
     "sycl",
     "auto_detect",
+    # PyTorch distributed
+    "register_torch_backend",
+    "register_torch_ucx_backend",
 ]

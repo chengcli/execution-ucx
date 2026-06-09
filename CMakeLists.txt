@@ -202,7 +202,7 @@ if(EXECUTION_UCX_BUILD_AXON_C10D_UCX)
 
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
   if(NOT TARGET UCX::ucp)
-    find_package(UCX REQUIRED)
+    find_package(UCX 1.18.1 REQUIRED)
   endif()
 
   add_library(

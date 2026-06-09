@@ -337,6 +337,7 @@ if(EXECUTION_UCX_BUILD_AXON_C10D_PYTHON)
           execution_ucx.axon_c10d_torchrun_gpu
           PROPERTIES
             ENVIRONMENT "UCX_TLS=sm,cuda_copy,cuda_ipc"
+            SKIP_RETURN_CODE 77
             TIMEOUT 120)
       endif()
     endif()

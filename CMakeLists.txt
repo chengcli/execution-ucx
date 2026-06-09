@@ -288,7 +288,7 @@ if(EXECUTION_UCX_BUILD_AXON_C10D_PYTHON)
     add_test(
       NAME execution_ucx.axon_c10d_python
       COMMAND
-        Python::Interpreter
+        "${Python_EXECUTABLE}"
         "${CMAKE_CURRENT_SOURCE_DIR}/axon/python/tests/test_c10d_backend_registration.py"
         "${CMAKE_CURRENT_SOURCE_DIR}/axon/python"
         "${CMAKE_CURRENT_BINARY_DIR}/python/axon")

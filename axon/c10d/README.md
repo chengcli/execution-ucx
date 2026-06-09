@@ -35,7 +35,7 @@ initializers:
 #include <axon/c10d/axon_backend.hpp>
 
 auto pg = c10::make_intrusive<c10d::ProcessGroup>(store, rank, world_size);
-auto transport = std::make_shared<MyAxonTransport>(store, rank, world_size);
+auto transport = std::make_shared<AxonTx>(store, rank, world_size);
 
 eux::axon::c10d::InstallAxonBackend(
   pg, store, transport,
@@ -62,10 +62,28 @@ Then register a transport factory before initializing `torch.distributed`:
 import axon
 import torch.distributed as dist
 
-axon.register_torch_backend(MyAxonTransport, devices=("cpu", "cuda"))
+axon.register_torch_backend(AxonTx, devices=("cpu", "cuda"))
 dist.init_process_group("axon")
 ```
 
 The factory receives `(store, rank, world_size, timeout)`. Its returned
 transport object must implement `send`, `recv`, `barrier`, `allreduce`, and
 `reduce`, with each method returning a PyTorch distributed `Work` object.
+
+The registration works with `torchrun` when every worker registers the backend
+before calling `init_process_group`:
+
+```python
+axon.register_torch_ucx_backend()
+dist.init_process_group("axon", init_method="env://")
+```
+
+```sh
+torchrun --standalone --nproc-per-node=2 application.py
+```
+
+`torchrun` supplies the rendezvous store, rank, world size, and timeout to each
+transport factory. Build the concrete UCX transport and bindings with
+`EXECUTION_UCX_BUILD_AXON_C10D_UCX=ON` and
+`EXECUTION_UCX_BUILD_AXON_C10D_PYTHON=ON`. It currently supports contiguous CPU
+tensors and SUM reductions.

@@ -20,6 +20,7 @@ option(EXECUTION_UCX_BUILD_UCX "Build the OpenUCX runtime components" OFF)
 option(EXECUTION_UCX_BUILD_EXAMPLES "Build examples (requires the UCX components)" OFF)
 option(EXECUTION_UCX_ENABLE_CUDA "Enable CUDA support" OFF)
 option(EXECUTION_UCX_BUILD_AXON_C10D "Build the optional Axon PyTorch c10d backend adapter" OFF)
+option(EXECUTION_UCX_BUILD_AXON_C10D_UCX "Build the concrete UCX Axon c10d transport" OFF)
 option(EXECUTION_UCX_BUILD_AXON_C10D_PYTHON "Build Python bindings for the Axon c10d backend" OFF)
 option(EXECUTION_UCX_INSTALL "Generate execution-ucx install rules" ${EXECUTION_UCX_IS_TOP_LEVEL})
 
@@ -193,6 +194,31 @@ if(EXECUTION_UCX_BUILD_AXON_C10D)
   endif()
 endif()
 
+if(EXECUTION_UCX_BUILD_AXON_C10D_UCX)
+  if(NOT TARGET execution_ucx_axon_c10d)
+    message(FATAL_ERROR "EXECUTION_UCX_BUILD_AXON_C10D_UCX requires EXECUTION_UCX_BUILD_AXON_C10D=ON")
+  endif()
+
+  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+  if(NOT TARGET UCX::ucp)
+    find_package(UCX REQUIRED)
+  endif()
+
+  add_library(
+    execution_ucx_axon_c10d_ucx
+    axon/src/c10d/axon_ucx_transport.cpp)
+  add_library(execution-ucx::axon_c10d_ucx ALIAS execution_ucx_axon_c10d_ucx)
+  target_compile_features(execution_ucx_axon_c10d_ucx PUBLIC cxx_std_20)
+  target_link_libraries(
+    execution_ucx_axon_c10d_ucx
+    PUBLIC execution-ucx::axon_c10d UCX::ucp)
+  set_target_properties(
+    execution_ucx_axon_c10d_ucx
+    PROPERTIES
+      EXPORT_NAME axon_c10d_ucx
+      POSITION_INDEPENDENT_CODE ON)
+endif()
+
 if(EXECUTION_UCX_BUILD_AXON_C10D_PYTHON)
   if(NOT TARGET execution_ucx_axon_c10d)
     message(FATAL_ERROR "EXECUTION_UCX_BUILD_AXON_C10D_PYTHON requires EXECUTION_UCX_BUILD_AXON_C10D=ON")
@@ -214,6 +240,10 @@ if(EXECUTION_UCX_BUILD_AXON_C10D_PYTHON)
       execution-ucx::axon_c10d
       Python::Module
       "${TORCH_PYTHON_LIBRARY}")
+  if(TARGET execution_ucx_axon_c10d_ucx)
+    target_compile_definitions(_axon_c10d PRIVATE AXON_C10D_UCX_ENABLED=1)
+    target_link_libraries(_axon_c10d PRIVATE execution-ucx::axon_c10d_ucx)
+  endif()
   set_target_properties(
     _axon_c10d
     PROPERTIES
@@ -231,6 +261,31 @@ if(EXECUTION_UCX_BUILD_AXON_C10D_PYTHON)
     set_tests_properties(
       execution_ucx.axon_c10d_python
       PROPERTIES TIMEOUT 60)
+
+    if(TARGET execution_ucx_axon_c10d_ucx)
+      get_filename_component(
+        Python_EXECUTABLE_DIRECTORY "${Python_EXECUTABLE}" DIRECTORY)
+      find_program(
+        TORCHRUN_EXECUTABLE
+        NAMES torchrun
+        HINTS "${Python_EXECUTABLE_DIRECTORY}"
+        REQUIRED)
+
+      add_test(
+        NAME execution_ucx.axon_c10d_torchrun
+        COMMAND
+          "${TORCHRUN_EXECUTABLE}"
+          --standalone
+          --nproc-per-node=2
+          "${CMAKE_CURRENT_SOURCE_DIR}/axon/python/tests/test_c10d_backend_torchrun.py"
+          "${CMAKE_CURRENT_SOURCE_DIR}/axon/python"
+          "${CMAKE_CURRENT_BINARY_DIR}/python/axon")
+      set_tests_properties(
+        execution_ucx.axon_c10d_torchrun
+        PROPERTIES
+          ENVIRONMENT "UCX_NET_DEVICES=lo"
+          TIMEOUT 60)
+    endif()
   endif()
 endif()
 
@@ -260,6 +315,15 @@ if(EXECUTION_UCX_INSTALL)
   if(TARGET execution_ucx_axon_c10d)
     install(
       TARGETS execution_ucx_axon_c10d
+      EXPORT execution-ucx-targets
+      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+  endif()
+
+  if(TARGET execution_ucx_axon_c10d_ucx)
+    install(
+      TARGETS execution_ucx_axon_c10d_ucx
       EXPORT execution-ucx-targets
       ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
       LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -297,6 +361,7 @@ if(EXECUTION_UCX_INSTALL)
   set(EXECUTION_UCX_CONFIG_HAS_RUNTIME "${EXECUTION_UCX_BUILD_UCX}")
   set(EXECUTION_UCX_CONFIG_HAS_CUDA "${EXECUTION_UCX_ENABLE_CUDA}")
   set(EXECUTION_UCX_CONFIG_HAS_AXON_C10D "${EXECUTION_UCX_BUILD_AXON_C10D}")
+  set(EXECUTION_UCX_CONFIG_HAS_AXON_C10D_UCX "${EXECUTION_UCX_BUILD_AXON_C10D_UCX}")
   configure_package_config_file(
     cmake/execution-ucx-config.cmake.in
     "${CMAKE_CURRENT_BINARY_DIR}/execution-ucx-config.cmake"
@@ -312,7 +377,7 @@ if(EXECUTION_UCX_INSTALL)
       "${CMAKE_CURRENT_BINARY_DIR}/execution-ucx-config-version.cmake"
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/execution-ucx)
 
-  if(EXECUTION_UCX_BUILD_UCX)
+  if(EXECUTION_UCX_BUILD_UCX OR EXECUTION_UCX_BUILD_AXON_C10D_UCX)
     install(FILES cmake/FindUCX.cmake DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/execution-ucx)
   endif()
 endif()

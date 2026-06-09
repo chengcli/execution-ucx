@@ -15,6 +15,10 @@ limitations under the License.
 
 #include "axon/c10d/axon_backend.hpp"
 
+#ifdef AXON_C10D_UCX_ENABLED
+#include "axon/c10d/axon_ucx_transport.hpp"
+#endif
+
 #include <chrono>
 #include <memory>
 #include <optional>
@@ -91,6 +95,19 @@ class __attribute__((visibility("hidden"))) PythonAxonTransport final
     store, rank, world_size, options);
 }
 
+#ifdef AXON_C10D_UCX_ENABLED
+::c10::intrusive_ptr<::c10d::Backend> CreateUcxBackend(
+  const ::c10::intrusive_ptr<::c10d::Store>& store, int rank, int world_size,
+  std::chrono::milliseconds timeout) {
+  auto transport =
+    std::make_shared<c10d::AxonUcxTransport>(store, rank, world_size, timeout);
+  auto options = ::c10::make_intrusive<c10d::AxonBackend::Options>(
+    std::move(transport), timeout);
+  return ::c10::make_intrusive<c10d::AxonBackend>(
+    store, rank, world_size, options);
+}
+#endif
+
 }  // namespace eux::axon::python
 
 PYBIND11_MODULE(_axon_c10d, module) {
@@ -100,4 +117,10 @@ PYBIND11_MODULE(_axon_c10d, module) {
     "create_backend", &eux::axon::python::CreateAxonBackend, py::arg("store"),
     py::arg("rank"), py::arg("world_size"), py::arg("timeout"),
     py::arg("transport"));
+#ifdef AXON_C10D_UCX_ENABLED
+  module.def(
+    "create_ucx_backend", &eux::axon::python::CreateUcxBackend,
+    py::arg("store"), py::arg("rank"), py::arg("world_size"),
+    py::arg("timeout"));
+#endif
 }

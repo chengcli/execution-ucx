@@ -22,7 +22,11 @@ def load_registration_helper(source_dir: pathlib.Path, extension_dir: pathlib.Pa
 
 
 def main():
-    assert torch.cuda.device_count() >= 2
+    if torch.cuda.device_count() < 2:
+        print(
+            f"Axon c10d torchrun GPU test skipped: found {torch.cuda.device_count()} GPU(s)."
+        )
+        sys.exit(77)
     local_rank = int(os.environ["LOCAL_RANK"])
     torch.cuda.set_device(local_rank)
     device = torch.device("cuda", local_rank)

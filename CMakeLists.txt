@@ -194,8 +194,8 @@ if(EXECUTION_UCX_BUILD_AXON_C10D)
           SKIP_RETURN_CODE 77
           TIMEOUT 60)
     endif()
+  endif()
 endif()
-
 if(EXECUTION_UCX_BUILD_AXON_C10D_UCX)
   if(NOT TARGET execution_ucx_axon_c10d)
     message(FATAL_ERROR "EXECUTION_UCX_BUILD_AXON_C10D_UCX requires EXECUTION_UCX_BUILD_AXON_C10D=ON")

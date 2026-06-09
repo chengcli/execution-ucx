@@ -177,22 +177,23 @@ if(EXECUTION_UCX_BUILD_AXON_C10D)
       NAME execution_ucx.axon_c10d
       COMMAND execution_ucx_axon_c10d_test)
 
-    add_executable(
-      execution_ucx_axon_c10d_gpu_test
-      axon/tests/axon_c10d_backend_gpu_test.cpp)
-    target_compile_features(execution_ucx_axon_c10d_gpu_test PRIVATE cxx_std_20)
-    target_link_libraries(
-      execution_ucx_axon_c10d_gpu_test
-      PRIVATE execution-ucx::axon_c10d)
-    add_test(
-      NAME execution_ucx.axon_c10d_gpu
-      COMMAND execution_ucx_axon_c10d_gpu_test)
-    set_tests_properties(
-      execution_ucx.axon_c10d_gpu
-      PROPERTIES
-        SKIP_RETURN_CODE 77
-        TIMEOUT 60)
-  endif()
+    if(EXECUTION_UCX_ENABLE_CUDA)
+      add_executable(
+        execution_ucx_axon_c10d_gpu_test
+        axon/tests/axon_c10d_backend_gpu_test.cpp)
+      target_compile_features(execution_ucx_axon_c10d_gpu_test PRIVATE cxx_std_20)
+      target_link_libraries(
+        execution_ucx_axon_c10d_gpu_test
+        PRIVATE execution-ucx::axon_c10d)
+      add_test(
+        NAME execution_ucx.axon_c10d_gpu
+        COMMAND execution_ucx_axon_c10d_gpu_test)
+      set_tests_properties(
+        execution_ucx.axon_c10d_gpu
+        PROPERTIES
+          SKIP_RETURN_CODE 77
+          TIMEOUT 60)
+    endif()
 endif()
 
 if(EXECUTION_UCX_BUILD_AXON_C10D_UCX)
